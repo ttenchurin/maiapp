@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
-    "lint": "eslint . --ext .js" // <-- добавляем эту строку
+    "lint": "eslint . --ext .js"
 
   },
   "dependencies": {
