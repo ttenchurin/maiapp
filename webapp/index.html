@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расписание МАИ</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            padding: 24px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo svg, .logo img {
+            max-width: 150px;
+            height: auto;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border 0.2s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        .auth-switch {
+            text-align: center;
+            margin-top: 16px;
+        }
+        .auth-switch a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .error {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .success {
+            color: #28a745;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .hidden {
+            display: none;
+        }
+        /* Главный экран */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .logout-btn {
+            width: auto;
+            padding: 8px 16px;
+            background: #dc3545;
+        }
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        .week-selector {
+            margin: 20px 0;
+        }
+        .lesson-card {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #fafafa;
+        }
+        .lesson-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .lesson-title {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .lesson-time {
+            color: #666;
+        }
+        .lesson-details {
+            font-size: 14px;
+            color: #444;
+            margin: 4px 0;
+        }
+        .note-panel {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #ddd;
+        }
+        .note-panel textarea {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .note-panel button {
+            width: auto;
+            padding: 8px 16px;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .date-header {
+            font-weight: bold;
+            font-size: 18px;
+            background: #e9ecef;
+            padding: 8px;
+            margin: 16px 0 8px;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .spinner {
+            width: 100%;
+            padding: 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- Экран авторизации (по умолчанию видим) -->
+        <div id="auth-screen">
+            <div class="logo">
+    		<img src="./MAIlogo.png" alt="Логотип МАИ" width="150" height="150">
+	    </div>
+            <h2>Расписание МАИ</h2>
+            <div id="auth-forms">
+                <!-- Форма входа (видима по умолчанию) -->
+                <div id="login-form">
+                    <div class="form-group">
+                        <label>Логин</label>
+                        <input type="text" id="login-username" placeholder="Введите логин">
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль</label>
+                        <input type="password" id="login-password" placeholder="Введите пароль">
+                    </div>
+                    <button id="login-btn">Войти</button>
+                    <div class="auth-switch">
+                        <a href="#" id="show-register">Нет аккаунта? Зарегистрируйтесь</a>
+                    </div>
+                </div>
+                <!-- Форма регистрации (скрыта) -->
+                <div id="register-form" class="hidden">
+                    <div class="form-group">
+                        <label>Логин</label>
+                        <input type="text" id="register-username" placeholder="Придумайте логин">
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль</label>
+                        <input type="password" id="register-password" placeholder="Придумайте пароль">
+                    </div>
+                    <button id="register-btn">Зарегистрироваться</button>
+                    <div class="auth-switch">
+                        <a href="#" id="show-login">Уже есть аккаунт? Войти</a>
+                    </div>
+                </div>
+            </div>
+            <div id="auth-error" class="error"></div>
+            <div id="auth-success" class="success"></div>
+            <div id="auth-loader" class="loader hidden"></div>
+        </div>
+
+        <!-- Главный экран с расписанием (скрыт) -->
+        <div id="schedule-screen" class="hidden">
+            <div class="top-bar">
+                <h2>Расписание</h2>
+                <button id="logout-btn" class="logout-btn">Выйти</button>
+            </div>
+            <div class="form-group">
+                <label>Группа</label>
+                <input type="text" id="group-input" placeholder="Например, М4О-103СВ-25" value="М4О-103СВ-25">
+            </div>
+            <button id="load-schedule-btn">Узнать расписание</button>
+            <div class="week-selector hidden">
+                <label for="week-spinner">Неделя</label>
+                <select id="week-spinner" class="spinner"></select>
+            </div>
+            <div id="lessons-container"></div>
+            <div id="schedule-loader" class="loader hidden"></div>
+            <div id="schedule-error" class="error"></div>
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация
+        const API_BASE = 'http://89.169.15.36:3000'; // Замените на адрес вашего сервера
+        const BASIC_AUTH = { user: 'maiapp', pass: 'maiapp' }; // из .env сервера
+
+        // Состояние приложения
+        let userUuid = localStorage.getItem('userUuid') || null;
+        let currentWeekNumber = null;
+        let weeks = [];
+
+        // Элементы DOM
+        const authScreen = document.getElementById('auth-screen');
+        const scheduleScreen = document.getElementById('schedule-screen');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const authError = document.getElementById('auth-error');
+        const authSuccess = document.getElementById('auth-success');
+        const authLoader = document.getElementById('auth-loader');
+        const scheduleLoader = document.getElementById('schedule-loader');
+        const scheduleError = document.getElementById('schedule-error');
+        const lessonsContainer = document.getElementById('lessons-container');
+        const weekSpinner = document.getElementById('week-spinner');
+        const weekSelector = document.querySelector('.week-selector');
+        const groupInput = document.getElementById('group-input');
+        const loadScheduleBtn = document.getElementById('load-schedule-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // Вспомогательная функция для запросов с Basic Auth
+        async function apiRequest(endpoint, method = 'GET', body = null) {
+            const url = API_BASE + endpoint;
+            const headers = {
+                'Authorization': 'Basic ' + btoa(BASIC_AUTH.user + ':' + BASIC_AUTH.pass),
+                'Content-Type': 'application/json'
+            };
+            const options = { method, headers };
+            if (body) options.body = JSON.stringify(body);
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || 'Ошибка запроса');
+            }
+            // Если ответ пустой (204) или не JSON, вернуть текст
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return await response.json();
+            } else {
+                return await response.text();
+            }
+        }
+
+        // Переключение экранов
+        function showAuthScreen() {
+            authScreen.classList.remove('hidden');
+            scheduleScreen.classList.add('hidden');
+        }
+
+        function showScheduleScreen() {
+            authScreen.classList.add('hidden');
+            scheduleScreen.classList.remove('hidden');
+            loadWeeksAndSchedule(); // автоматически загрузим данные для сохранённой группы
+        }
+
+        // Обработчики переключения форм
+        document.getElementById('show-register').addEventListener('click', (e) => {
+            e.preventDefault();
+            loginForm.classList.add('hidden');
+            registerForm.classList.remove('hidden');
+            authError.textContent = '';
+            authSuccess.textContent = '';
+        });
+
+        document.getElementById('show-login').addEventListener('click', (e) => {
+            e.preventDefault();
+            registerForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            authError.textContent = '';
+            authSuccess.textContent = '';
+        });
+
+        // Регистрация
+        document.getElementById('register-btn').addEventListener('click', async () => {
+            const login = document.getElementById('register-username').value.trim();
+            const password = document.getElementById('register-password').value.trim();
+            if (!login || !password) {
+                authError.textContent = 'Заполните все поля';
+                return;
+            }
+            authError.textContent = '';
+            authSuccess.textContent = '';
+            authLoader.classList.remove('hidden');
+            try {
+                const data = await apiRequest('/register', 'POST', { login, password });
+                authSuccess.textContent = 'Регистрация успешна! Теперь войдите.';
+                document.getElementById('register-username').value = '';
+                document.getElementById('register-password').value = '';
+                // Переключаем на вход
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+            } catch (err) {
+                authError.textContent = err.message;
+            } finally {
+                authLoader.classList.add('hidden');
+            }
+        });
+
+        // Вход
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const login = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            if (!login || !password) {
+                authError.textContent = 'Заполните все поля';
+                return;
+            }
+            authError.textContent = '';
+            authSuccess.textContent = '';
+            authLoader.classList.remove('hidden');
+            try {
+                const data = await apiRequest('/login', 'POST', { login, password });
+                userUuid = data.uuid;
+                localStorage.setItem('userUuid', userUuid);
+                showScheduleScreen();
+            } catch (err) {
+                authError.textContent = err.message;
+            } finally {
+                authLoader.classList.add('hidden');
+            }
+        });
+
+        // Выход
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('userUuid');
+            userUuid = null;
+            currentWeekNumber = null;
+            weeks = [];
+            showAuthScreen();
+        });
+
+        // Загрузка расписания
+        async function loadWeeksAndSchedule(week = null) {
+            const group = groupInput.value.trim();
+            if (!group) {
+                scheduleError.textContent = 'Введите группу';
+                return;
+            }
+            scheduleError.textContent = '';
+            scheduleLoader.classList.remove('hidden');
+            lessonsContainer.innerHTML = '';
+            weekSelector.classList.add('hidden');
+            try {
+                let url = `/schedule?group=${encodeURIComponent(group)}`;
+                if (week !== null && week !== undefined) {
+                    url += `&week=${week}`;
+                }
+                const data = await apiRequest(url, 'GET');
+                weeks = data.weeks || [];
+                displayWeeks(weeks, data.lessons);
+                // Если не передавали неделю, то weekSpinner остаётся на подсказке
+                if (week === null || week === undefined) {
+                    currentWeekNumber = null;
+                }
+            } catch (err) {
+                scheduleError.textContent = err.message;
+            } finally {
+                scheduleLoader.classList.add('hidden');
+            }
+        }
+
+        // Отображение недель в спиннере
+        function displayWeeks(weeksList, lessons) {
+            // Очистить спиннер
+            weekSpinner.innerHTML = '';
+            // Добавить пустой элемент (подсказку)
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Выберите неделю';
+            defaultOption.selected = true;
+            weekSpinner.appendChild(defaultOption);
+
+            weeksList.forEach(w => {
+                const option = document.createElement('option');
+                option.value = w.number;
+                option.textContent = `Неделя ${w.number} (${w.start} - ${w.end})`;
+                weekSpinner.appendChild(option);
+            });
+
+            // Восстановить выбранную неделю
+            if (currentWeekNumber !== null) {
+                weekSpinner.value = currentWeekNumber;
+            } else {
+                weekSpinner.value = '';
+            }
+
+            weekSelector.classList.remove('hidden');
+            displayLessons(lessons);
+        }
+
+        // Отображение уроков с группировкой по дате и раскрывающимися заметками
+        function displayLessons(lessons) {
+            lessonsContainer.innerHTML = '';
+            if (!lessons || lessons.length === 0) {
+                lessonsContainer.innerHTML = '<p>Нет занятий</p>';
+                return;
+            }
+
+            // Группируем по дате
+            const grouped = lessons.reduce((acc, lesson) => {
+                (acc[lesson.date] = acc[lesson.date] || []).push(lesson);
+                return acc;
+            }, {});
+
+            // Сортируем даты
+            const sortedDates = Object.keys(grouped).sort();
+
+            sortedDates.forEach(date => {
+                // Заголовок даты
+                const dateHeader = document.createElement('div');
+                dateHeader.className = 'date-header';
+                dateHeader.textContent = formatDate(date);
+                lessonsContainer.appendChild(dateHeader);
+
+                // Уроки этой даты
+                grouped[date].forEach(lesson => {
+                    const card = document.createElement('div');
+                    card.className = 'lesson-card';
+                    card.dataset.classId = lesson.id;
+                    card.dataset.expanded = 'false';
+
+                    // Верхняя часть (кликабельная)
+                    const header = document.createElement('div');
+                    header.className = 'lesson-header';
+                    header.innerHTML = `
+                        <span class="lesson-title">${escapeHtml(lesson.subject)}</span>
+                        <span class="lesson-time">${escapeHtml(lesson.time)}</span>
+                    `;
+                    header.addEventListener('click', () => toggleLesson(card, lesson.id));
+
+                    // Детали (преподаватель, аудитория)
+                    const details = document.createElement('div');
+                    details.className = 'lesson-details';
+                    details.innerHTML = `
+                        <div>${escapeHtml(lesson.teacher || 'Преподаватель не указан')}</div>
+                        <div>${escapeHtml(lesson.room || 'Аудитория не указана')}</div>
+                    `;
+
+                    // Панель заметки (скрыта)
+                    const notePanel = document.createElement('div');
+                    notePanel.className = 'note-panel hidden';
+                    notePanel.innerHTML = `
+                        <textarea placeholder="Ваша заметка" rows="3"></textarea>
+                        <button class="save-note-btn">Сохранить</button>
+                    `;
+
+                    card.appendChild(header);
+                    card.appendChild(details);
+                    card.appendChild(notePanel);
+                    lessonsContainer.appendChild(card);
+                });
+            });
+        }
+
+        // Функция раскрытия/закрытия заметки с загрузкой текста
+        async function toggleLesson(card, classId) {
+            const notePanel = card.querySelector('.note-panel');
+            const isExpanded = card.dataset.expanded === 'true';
+            if (isExpanded) {
+                // Скрыть
+                notePanel.classList.add('hidden');
+                card.dataset.expanded = 'false';
+            } else {
+                // Показать и загрузить заметку
+                notePanel.classList.remove('hidden');
+                card.dataset.expanded = 'true';
+                const textarea = notePanel.querySelector('textarea');
+                const saveBtn = notePanel.querySelector('.save-note-btn');
+                // Блокируем поле на время загрузки
+                textarea.disabled = true;
+                textarea.placeholder = 'Загрузка...';
+                try {
+                    if (!userUuid) throw new Error('Пользователь не авторизован');
+                    const noteData = await apiRequest(`/note?user_uuid=${userUuid}&class_id=${classId}`, 'GET');
+                    textarea.value = noteData.note || '';
+                } catch (err) {
+                    console.error(err);
+                    textarea.value = '';
+                } finally {
+                    textarea.disabled = false;
+                    textarea.placeholder = 'Ваша заметка';
+                }
+
+                // Обработчик сохранения
+                saveBtn.onclick = async () => {
+                    const note = textarea.value;
+                    try {
+                        await apiRequest('/note', 'POST', { user_uuid: userUuid, class_id: classId, note });
+                        alert('Заметка сохранена');
+                    } catch (err) {
+                        alert('Ошибка сохранения');
+                    }
+                };
+            }
+        }
+
+        // Вспомогательная функция экранирования HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Форматирование даты YYYY-MM-DD в DD.MM.YYYY
+        function formatDate(dateStr) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                return `${parts[2]}.${parts[1]}.${parts[0]}`;
+            }
+            return dateStr;
+        }
+
+        // Обработчик выбора недели
+        weekSpinner.addEventListener('change', () => {
+            const week = weekSpinner.value;
+            if (week) {
+                currentWeekNumber = parseInt(week, 10);
+                loadWeeksAndSchedule(currentWeekNumber);
+            } else {
+                currentWeekNumber = null;
+                loadWeeksAndSchedule(null);
+            }
+        });
+
+        // Кнопка загрузки расписания
+        loadScheduleBtn.addEventListener('click', () => {
+            loadWeeksAndSchedule(currentWeekNumber);
+        });
+
+        // При старте проверяем, есть ли сохранённый uuid
+        if (userUuid) {
+            showScheduleScreen();
+        } else {
+            showAuthScreen();
+        }
+
+        // Загружаем расписание при первом входе (если есть группа по умолчанию)
+        if (userUuid) {
+            loadWeeksAndSchedule(null);
+        }
+    </script>
+</body>
+</html>
