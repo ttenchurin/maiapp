@@ -15,7 +15,7 @@ app.use(express.json());
 const cors = require('cors');
 app.use(cors()); // разрешить все источники (для разработки)
 
-
+int unused_int;
 
 
 const pool = new Pool({
