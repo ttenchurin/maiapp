@@ -1,6 +1,8 @@
 
 require('dotenv').config();
 
+const unusedVar = 'эта переменная не используется';
+
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
