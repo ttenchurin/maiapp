@@ -111,8 +111,8 @@ app.post('/login', async (req, res) => {
   const { login, password } = req.body;
 
   try {
-    // const result = await pool.query('SELECT id FROM users WHERE login=$1 AND password=$2',[login, password]);
-	const result = await pool.query(`SELECT id FROM users WHERE login='${login}' AND password='${password}'`);
+     const result = await pool.query('SELECT id FROM users WHERE login=$1 AND password=$2',[login, password]);
+	// const result = await pool.query(`SELECT id FROM users WHERE login='${login}' AND password='${password}'`);
 
     if (result.rows.length === 0) {
       console.log(`❌ Login failed: invalid credentials for "${login}"`);
