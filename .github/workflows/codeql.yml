@@ -39,24 +39,36 @@ jobs:
         output: sarif-results
         upload: never
 
+    - name: Debug SARIF directory
+      run: |
+        echo "Listing current directory:"
+        ls -la
+        if [ -d sarif-results ]; then
+          echo "Contents of sarif-results:"
+          ls -la sarif-results/
+        else
+          echo "❌ sarif-results directory not found"
+        fi
+
     - name: Check for SQL injection issues
       run: |
-        if [ -f sarif-results/${{ matrix.language }}.sarif ]; then
-          echo "🔍 Searching for SQL injection vulnerabilities..."
-          # Устанавливаем jq
-          sudo apt-get update && sudo apt-get install -y jq
-          # Ищем результаты, где ruleId содержит "sql-injection" или message содержит "user-controlled"
-          issues=$(jq '.runs[].results[] | select(
-            (.ruleId | test("sql-injection"; "i")) or
-            (.message.text | test("user-controlled|SQL injection"; "i"))
-          )' sarif-results/${{ matrix.language }}.sarif)
-          if [ -n "$issues" ]; then
-            echo "❌ Found potential SQL injection vulnerabilities:"
-            echo "$issues"
-            exit 1
-          else
-            echo "✅ No SQL injection issues detected."
-          fi
+        # Находим любой SARIF-файл в директории
+        SARIF_FILE=$(find sarif-results -name "*.sarif" | head -n 1)
+        if [ -z "$SARIF_FILE" ]; then
+          echo "❌ No SARIF file found. CodeQL analysis may have failed."
+          exit 1
+        fi
+        echo "🔍 Analyzing $SARIF_FILE"
+        sudo apt-get update && sudo apt-get install -y jq
+        # Ищем уязвимости SQL-инъекций по ключевым словам
+        issues=$(jq '.runs[].results[] | select(
+          (.ruleId | test("sql-injection|sql|database"; "i")) or
+          (.message.text | test("user-controlled|SQL injection|database query built from user-controlled"; "i"))
+        )' "$SARIF_FILE")
+        if [ -n "$issues" ]; then
+          echo "❌ Found potential SQL injection vulnerabilities:"
+          echo "$issues"
+          exit 1
         else
-          echo "SARIF file not found."
+          echo "✅ No SQL injection issues detected."
         fi
