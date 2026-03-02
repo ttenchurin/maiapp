@@ -39,6 +39,7 @@ jobs:
         output: sarif-results
         upload: never
 
+    # Диагностический шаг – помогает убедиться, что SARIF-файл создан
     - name: Debug SARIF directory
       run: |
         echo "Listing current directory:"
@@ -50,24 +51,59 @@ jobs:
           echo "❌ sarif-results directory not found"
         fi
 
+    # Основная проверка на SQL-инъекции
     - name: Check for SQL injection issues
       run: |
-        # Находим любой SARIF-файл в директории
+        # Находим любой SARIF-файл в директории sarif-results
         SARIF_FILE=$(find sarif-results -name "*.sarif" | head -n 1)
         if [ -z "$SARIF_FILE" ]; then
           echo "❌ No SARIF file found. CodeQL analysis may have failed."
           exit 1
         fi
         echo "🔍 Analyzing $SARIF_FILE"
+
+        # Устанавливаем jq (если ещё не установлен)
         sudo apt-get update && sudo apt-get install -y jq
-        # Ищем уязвимости SQL-инъекций по ключевым словам
-        issues=$(jq '.runs[].results[] | select(
+
+        # Извлекаем все результаты, подходящие под критерии SQL-инъекций
+        ISSUES_JSON=$(jq -c '.runs[].results[] | select(
           (.ruleId | test("sql-injection|sql|database"; "i")) or
           (.message.text | test("user-controlled|SQL injection|database query built from user-controlled"; "i"))
         )' "$SARIF_FILE")
-        if [ -n "$issues" ]; then
-          echo "❌ Found potential SQL injection vulnerabilities:"
-          echo "$issues"
+
+        if [ -n "$ISSUES_JSON" ]; then
+          COUNT=$(echo "$ISSUES_JSON" | wc -l)
+          echo "❌ Found $COUNT potential SQL injection vulnerabilities:"
+
+          # Обрабатываем каждое предупреждение
+          echo "$ISSUES_JSON" | while read -r result; do
+            echo "---"
+            ruleId=$(echo "$result" | jq -r '.ruleId // "unknown"')
+            message=$(echo "$result" | jq -r '.message.text // "No message"')
+
+            # Извлекаем местоположение (если есть)
+            location=$(echo "$result" | jq -c '.locations[0].physicalLocation')
+            if [ "$location" != "null" ] && [ -n "$location" ]; then
+              uri=$(echo "$location" | jq -r '.artifactLocation.uri // ""')
+              startLine=$(echo "$location" | jq -r '.region.startLine // ""')
+              # Пробуем получить фрагмент кода
+              snippet=$(echo "$location" | jq -r '.contextRegion.snippet.text // .region.snippet.text // ""')
+              if [ -z "$snippet" ] || [ "$snippet" = "null" ]; then
+                snippet="(no snippet)"
+              fi
+
+              echo "Rule: $ruleId"
+              echo "Message: $message"
+              echo "File: $uri"
+              echo "Line: $startLine"
+              echo "Code snippet: $snippet"
+            else
+              echo "Rule: $ruleId"
+              echo "Message: $message"
+              echo "Location: not specified"
+            fi
+          done
+
           exit 1
         else
           echo "✅ No SQL injection issues detected."
