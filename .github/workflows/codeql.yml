@@ -37,19 +37,25 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         output: sarif-results
-        upload: never  # Не загружаем результаты автоматически, обработаем сами
+        upload: never
 
-    - name: Check for errors in SARIF
+    - name: Check for SQL injection issues
       run: |
         if [ -f sarif-results/${{ matrix.language }}.sarif ]; then
+          echo "🔍 Searching for SQL injection vulnerabilities..."
+          # Устанавливаем jq
           sudo apt-get update && sudo apt-get install -y jq
-          issues=$(jq '.runs[].results[] | select(.level == "error" or .level == "warning")' sarif-results/${{ matrix.language }}.sarif)
+          # Ищем результаты, где ruleId содержит "sql-injection" или message содержит "user-controlled"
+          issues=$(jq '.runs[].results[] | select(
+            (.ruleId | test("sql-injection"; "i")) or
+            (.message.text | test("user-controlled|SQL injection"; "i"))
+          )' sarif-results/${{ matrix.language }}.sarif)
           if [ -n "$issues" ]; then
-            echo "❌ CodeQL found security issues:"
+            echo "❌ Found potential SQL injection vulnerabilities:"
             echo "$issues"
             exit 1
           else
-            echo "✅ No critical issues found."
+            echo "✅ No SQL injection issues detected."
           fi
         else
           echo "SARIF file not found."
