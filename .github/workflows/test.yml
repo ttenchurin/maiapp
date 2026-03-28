@@ -67,7 +67,7 @@ jobs:
           # Добавьте другие переменные, которые нужны вашему API
           EOF
 
-      - name: Run database migrations (если нужны)
+        # - name: Run database migrations (если нужны)
         #run: npm run migrate   # или скрипт инициализации БД
         # Если миграций нет, создайте таблицы вручную через скрипт
 
