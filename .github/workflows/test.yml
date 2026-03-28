@@ -1,0 +1,79 @@
+name: Java Tests with Selenium
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: maven
+
+      - name: Install Chrome (headless)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Start test instances on server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
+            cd ~/maiapp   # ИЗМЕНИТЕ НА РЕАЛЬНЫЙ ПУТЬ К ПРОЕКТУ НА СЕРВЕРЕ
+            # Удаляем предыдущие тестовые процессы, если есть
+            pm2 delete maiapp-test 2>/dev/null || true
+            pm2 delete maiapp-ui-test 2>/dev/null || true
+            # Запускаем API на порту 3001
+            cd /path/to/maiapp
+            DOTENV_CONFIG_PATH=.env.test pm2 start servertest.js --name maiapp-test
+            # Запускаем UI на порту 8081
+           pm2 start npx --name maiapp-ui-test -- http-server ~maiapp/webapp/index.html
+            # Ждём, пока сервисы поднимутся
+            echo "Waiting for services to start..."
+            sleep 10
+            # Проверка готовности API (опционально)
+            for i in {1..30}; do
+              curl -s http://localhost:3001/health && break
+              sleep 2
+            done
+          EOF
+
+      - name: Run tests
+        run: |
+          mvn clean test -Dapp.url=http://${{ secrets.SERVER_HOST }}:8081
+
+      - name: Stop test instances
+        if: always()   # выполняется даже при ошибке тестов
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
+            pm2 delete maiapp-test
+            pm2 delete maiapp-ui-test
+          EOF
+
+      - name: Upload test reports (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports/
