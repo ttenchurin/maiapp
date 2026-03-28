@@ -68,7 +68,7 @@ jobs:
           EOF
 
       - name: Run database migrations (если нужны)
-        run: npm run migrate   # или скрипт инициализации БД
+        #run: npm run migrate   # или скрипт инициализации БД
         # Если миграций нет, создайте таблицы вручную через скрипт
 
       - name: Start API
