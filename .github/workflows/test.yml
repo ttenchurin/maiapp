@@ -26,8 +26,86 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install API dependencies
+        run: npm install  # если в корне есть package.json
+        # если API находится в подпапке, замените на cd api && npm install
+
+      - name: Install http-server globally
+        run: npm install -g http-server
+
+      - name: Prepare .env.test
+        run: |
+          # Если есть .env, копируем его, иначе создаём базовый
+          if [ -f .env ]; then
+            cp .env .env.test
+          else
+            echo "PORT=3001" > .env.test
+          fi
+          sed -i 's/^PORT=.*/PORT=3001/' .env.test
+          # Добавьте другие переменные, если нужно (DB_HOST, DB_USER и т.п.)
+          # Например:
+          # echo "DB_HOST=localhost" >> .env.test
+
+      - name: Start test API and UI
+        run: |
+          echo "Starting API on port 3001..."
+          DOTENV_CONFIG_PATH=.env.test node server.js > api.log 2>&1 &
+          API_PID=$!
+          echo "API PID: $API_PID"
+
+          echo "Preparing UI..."
+          # Создаём копию UI (предполагается, что UI лежит в папке webapp)
+          cp -r ./webapp ./webapp-test
+          # Подменяем адрес API на localhost:3001
+          sed -i 's|http://89.169.15.36:3000|http://localhost:3001|g' ./webapp-test/index.html
+
+          echo "Starting UI on port 8081..."
+          http-server ./webapp-test -p 8081 > ui.log 2>&1 &
+          UI_PID=$!
+          echo "UI PID: $UI_PID"
+
+          # Ждём, пока сервисы поднимутся
+          sleep 10
+
+          # Проверяем доступность API (пытаемся получить ответ)
+          echo "Testing API availability..."
+          for i in {1..20}; do
+            if curl -s http://localhost:3001/health > /dev/null; then
+              echo "API is ready."
+              break
+            fi
+            sleep 1
+          done
+          # Выводим последние строки логов API для отладки
+          echo "API log (last 20 lines):"
+          tail -20 api.log || true
+
+          echo "Testing UI availability..."
+          if curl -s http://localhost:8081 > /dev/null; then
+            echo "UI is ready."
+          else
+            echo "UI not reachable."
+            tail -20 ui.log || true
+          fi
+
+          # Сохраняем PID в переменные окружения для остановки
+          echo "API_PID=$API_PID" >> $GITHUB_ENV
+          echo "UI_PID=$UI_PID" >> $GITHUB_ENV
+
       - name: Run tests
-        run: mvn clean test -Dapp.url=http://89.169.15.36:8080
+        run: |
+          mvn clean test -Dapp.url=http://localhost:8081
+
+      - name: Stop test instances
+        if: always()
+        run: |
+          kill $API_PID || true
+          kill $UI_PID || true
 
       - name: Upload test reports
         if: always()
