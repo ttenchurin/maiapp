@@ -1,5 +1,5 @@
 name: Java Tests with Selenium
-
+ 
 on:
   push:
     branches: [ main ]
