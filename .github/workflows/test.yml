@@ -37,26 +37,23 @@ jobs:
       - name: Start test API and UI in background
         run: |
           # Создаём .env.test для API (если нужно)
-          cp .env .env.test 2>/dev/null || true
+          cp ~/.env ~/.env.test 2>/dev/null || true
           sed -i 's/^PORT=.*/PORT=3001/' .env.test
 
           # Запускаем API с отдельным .env.test
-          DOTENV_CONFIG_PATH=.env.test node servertest.js &
+          DOTENV_CONFIG_PATH=~/.env.test node servertest.js &
           # Если API называется servertest.js, замените server.js на servertest.js
 
           # Копируем UI во временную папку и подменяем адрес API
-          cp -r ./webapp ./webapp-test
+          cp -r ~/webapp ~/webapp-test
           sed -i 's|http://89.169.15.36:3000|http://localhost:3001|g' ./webapp-test/index.html
 
           # Запускаем статический сервер на порту 8081
-          http-server ./webapp-test -p 8081 &
+          http-server ~/webapp-test -p 8081 &
 
           # Ждём, пока сервисы поднимутся
           echo "Waiting for services to start..."
           sleep 10
-
-          # Проверяем доступность API (опционально)
-          curl -s http://localhost:3001/health || echo "API not ready"
 
       - name: Run tests
         run: |
