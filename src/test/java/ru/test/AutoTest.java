@@ -44,7 +44,7 @@ public class AutoTest {
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
 
         // Читаем URL из системного свойства, если не задано — используем значение по умолчанию
-        String baseUrl = System.getProperty("app.url", "http://89.169.15.36:8080");
+        String baseUrl = System.getProperty("app.url", "http://89.169.15.36:8081");
         driver.get(baseUrl);
 
         long timestamp = System.currentTimeMillis();
