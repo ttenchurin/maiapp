@@ -26,52 +26,43 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
-      - name: Setup SSH key
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          node-version: '18'
 
-      - name: Start test instances on server
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
+      - name: Install http-server globally
+        run: npm install -g http-server
+
+      - name: Start test API and UI in background
         run: |
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
-            cd ~/maiapp   # ИЗМЕНИТЕ НА РЕАЛЬНЫЙ ПУТЬ К ПРОЕКТУ НА СЕРВЕРЕ
-            # Удаляем предыдущие тестовые процессы, если есть
-            pm2 delete maiapp-test 2>/dev/null || true
-            pm2 delete maiapp-ui-test 2>/dev/null || true
-            # Запускаем API на порту 3001
-            cd /path/to/maiapp
-            DOTENV_CONFIG_PATH=.env.test pm2 start servertest.js --name maiapp-test
-            # Запускаем UI на порту 8081
-           pm2 start npx --name maiapp-ui-test -- http-server ~maiapp/webapp/index.html
-            # Ждём, пока сервисы поднимутся
-            echo "Waiting for services to start..."
-            sleep 10
-            # Проверка готовности API (опционально)
-            for i in {1..30}; do
-              curl -s http://localhost:3001/health && break
-              sleep 2
-            done
-          EOF
+          # Создаём .env.test для API (если нужно)
+          cp .env .env.test 2>/dev/null || true
+          sed -i 's/^PORT=.*/PORT=3001/' .env.test
+
+          # Запускаем API с отдельным .env.test
+          DOTENV_CONFIG_PATH=.env.test node servertest.js &
+          # Если API называется servertest.js, замените server.js на servertest.js
+
+          # Копируем UI во временную папку и подменяем адрес API
+          cp -r ./webapp ./webapp-test
+          sed -i 's|http://89.169.15.36:3000|http://localhost:3001|g' ./webapp-test/index.html
+
+          # Запускаем статический сервер на порту 8081
+          http-server ./webapp-test -p 8081 &
+
+          # Ждём, пока сервисы поднимутся
+          echo "Waiting for services to start..."
+          sleep 10
+
+          # Проверяем доступность API (опционально)
+          curl -s http://localhost:3001/health || echo "API not ready"
 
       - name: Run tests
         run: |
-          mvn clean test -Dapp.url=http://${{ secrets.SERVER_HOST }}:8081
+          mvn clean test -Dapp.url=http://localhost:8081
 
-      - name: Stop test instances
-        if: always()   # выполняется даже при ошибке тестов
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-        run: |
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
-            pm2 delete maiapp-test
-            pm2 delete maiapp-ui-test
-          EOF
-
-      - name: Upload test reports (optional)
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
