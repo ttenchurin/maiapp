@@ -40,39 +40,43 @@ jobs:
             PROD_DIR=~/maiapp
             TEST_DIR=~/maiapp-test
 
-            # Очистка предыдущих тестовых процессов и папок
             pm2 delete maiapp-test 2>/dev/null || true
             pm2 delete maiapp-ui-test 2>/dev/null || true
             rm -rf \$TEST_DIR
 
-            # Копируем продакшен-директорию
             cp -r \$PROD_DIR \$TEST_DIR
             cd \$TEST_DIR
 
-            # Готовим .env для тестового API (порт 3001)
-            cp .env .env.test
-            sed -i 's/^PORT=.*/PORT=3001/' .env.test
+            # Переименовываем для совместимости с ES-модулями
+            mv server.js server.cjs
 
-            # Убеждаемся, что http-server установлен глобально
+            # Создаём .env.test без PORT (порт передадим явно)
+            cp .env .env.test
+            sed -i '/^PORT=/d' .env.test
+
             npm list -g http-server || npm install -g http-server
 
-             mv server.js server.cjs
+            # Запускаем API с явным PORT=3001
+            PORT=3001 DOTENV_CONFIG_PATH=.env.test pm2 start server.cjs --name maiapp-test
 
-            # Запуск API на порту 3001
-            DOTENV_CONFIG_PATH=.env.test pm2 start server.cjs --name maiapp-test
-
-            # Подготовка UI: копируем и подменяем адрес API на тестовый порт (3001)
+            # Подготавливаем UI
             cp -r webapp webapp-test
             sed -i "s|http://89.169.15.36:3000|http://$SERVER_HOST:3001|g" webapp-test/index.html
 
-            # Запуск UI на порту 8081
+            # Запускаем UI на порту 8081
             pm2 start http-server --name maiapp-ui-test -- webapp-test -p 8081
 
-            # Ждём, пока сервисы поднимутся
             sleep 10
 
-            # Проверка доступности API (опционально)
-            curl -s http://localhost:3001/health || echo "API not ready"
+            # Проверка API: POST /register без данных, ожидаем 401 Unauthorized
+            echo "Checking API availability..."
+            STATUS_CODE=\$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3001/register)
+            if [ "\$STATUS_CODE" = "401" ]; then
+              echo "API is ready (401 response)"
+            else
+              echo "API not ready or unexpected response: \$STATUS_CODE"
+              exit 1
+            fi
           EOF
 
       - name: Run tests
