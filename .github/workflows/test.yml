@@ -56,8 +56,10 @@ jobs:
             # Убеждаемся, что http-server установлен глобально
             npm list -g http-server || npm install -g http-server
 
+             mv server.js server.cjs
+
             # Запуск API на порту 3001
-            DOTENV_CONFIG_PATH=.env.test pm2 start server.js --name maiapp-test
+            DOTENV_CONFIG_PATH=.env.test pm2 start server.cjs --name maiapp-test
 
             # Подготовка UI: копируем и подменяем адрес API на тестовый порт (3001)
             cp -r webapp webapp-test
