@@ -10,6 +10,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Поднимаем контейнер с БД
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: maiapp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,80 +48,57 @@ jobs:
           node-version: '18'
 
       - name: Install API dependencies
-        run: npm install  # если в корне есть package.json
-        # если API находится в подпапке, замените на cd api && npm install
+        run: npm install
 
-      - name: Install http-server globally
+      - name: Install http-server
         run: npm install -g http-server
 
       - name: Prepare .env.test
         run: |
-          # Если есть .env, копируем его, иначе создаём базовый
-          if [ -f .env ]; then
-            cp .env .env.test
-          else
-            echo "PORT=3001" > .env.test
-          fi
-          sed -i 's/^PORT=.*/PORT=3001/' .env.test
-          # Добавьте другие переменные, если нужно (DB_HOST, DB_USER и т.п.)
-          # Например:
-          # echo "DB_HOST=localhost" >> .env.test
+          cat > .env.test << EOF
+          PORT=3001
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_USER=postgres
+          DB_PASS=password
+          DB_NAME=maiapp
+          BASIC_LOGIN=admin
+          BASIC_PASS=secret
+          # Добавьте другие переменные, которые нужны вашему API
+          EOF
 
-      - name: Start test API and UI
+      - name: Run database migrations (если нужны)
+        run: npm run migrate   # или скрипт инициализации БД
+        # Если миграций нет, создайте таблицы вручную через скрипт
+
+      - name: Start API
         run: |
           echo "Starting API on port 3001..."
           DOTENV_CONFIG_PATH=.env.test node server.js > api.log 2>&1 &
-          API_PID=$!
-          echo "API PID: $API_PID"
+          sleep 10
+          echo "API logs:"
+          cat api.log
+          # Проверяем доступность
+          curl -v http://localhost:3001 || echo "API not reachable"
 
-          echo "Preparing UI..."
-          # Создаём копию UI (предполагается, что UI лежит в папке webapp)
+      - name: Prepare UI
+        run: |
+          # Копируем UI во временную папку
           cp -r ./webapp ./webapp-test
-          # Подменяем адрес API на localhost:3001
+          # Заменяем адрес API на localhost:3001
           sed -i 's|http://89.169.15.36:3000|http://localhost:3001|g' ./webapp-test/index.html
 
+      - name: Start UI
+        run: |
           echo "Starting UI on port 8081..."
           http-server ./webapp-test -p 8081 > ui.log 2>&1 &
-          UI_PID=$!
-          echo "UI PID: $UI_PID"
-
-          # Ждём, пока сервисы поднимутся
-          sleep 10
-
-          # Проверяем доступность API (пытаемся получить ответ)
-          echo "Testing API availability..."
-          for i in {1..20}; do
-            if curl -s http://localhost:3001/health > /dev/null; then
-              echo "API is ready."
-              break
-            fi
-            sleep 1
-          done
-          # Выводим последние строки логов API для отладки
-          echo "API log (last 20 lines):"
-          tail -20 api.log || true
-
-          echo "Testing UI availability..."
-          if curl -s http://localhost:8081 > /dev/null; then
-            echo "UI is ready."
-          else
-            echo "UI not reachable."
-            tail -20 ui.log || true
-          fi
-
-          # Сохраняем PID в переменные окружения для остановки
-          echo "API_PID=$API_PID" >> $GITHUB_ENV
-          echo "UI_PID=$UI_PID" >> $GITHUB_ENV
+          sleep 5
+          echo "UI logs:"
+          cat ui.log
+          curl -v http://localhost:8081 || echo "UI not reachable"
 
       - name: Run tests
-        run: |
-          mvn clean test -Dapp.url=http://localhost:8081
-
-      - name: Stop test instances
-        if: always()
-        run: |
-          kill $API_PID || true
-          kill $UI_PID || true
+        run: mvn clean test -Dapp.url=http://localhost:8081
 
       - name: Upload test reports
         if: always()
