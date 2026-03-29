@@ -1,4 +1,4 @@
-name: Security Scan (BDU)
+name: Security Scan (NVD)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  bdu-scan:
+  nvd-scan:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -19,8 +19,7 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: |
-          pip install requests beautifulsoup4
+        run: pip install requests
 
-      - name: Run BDU vulnerability check
-        run: python .github/scripts/check_bdu_vulns.py
+      - name: Check for vulnerabilities in dependencies
+        run: python .github/scripts/check_nvd_vulns.py
