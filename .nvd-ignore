@@ -1,0 +1,10 @@
+axios
+basic-auth
+cors
+dotenv
+express
+node-fetch
+pg
+tough-cookie
+uuid
+eslint
