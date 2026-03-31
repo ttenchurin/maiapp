@@ -4,7 +4,7 @@ cors
 dotenv
 express
 node-fetch
-pg
 tough-cookie
 uuid
 eslint
+pg
